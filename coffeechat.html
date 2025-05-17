@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Status</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Chat Status</h1>
+
+        <div class="status-display">
+            <p>User 1 Status: <span id="user1-status">Loading...</span></p>
+            <p>User 2 Status: <span id="user2-status">Loading...</span></p>
+        </div>
+
+        <div class="controls">
+            <h2>Your Status</h2>
+            <label class="switch">
+                <input type="checkbox" id="status-toggle">
+                <span class="slider round"></span>
+            </label>
+            <p id="current-status-text">Set to: No Chat</p>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
