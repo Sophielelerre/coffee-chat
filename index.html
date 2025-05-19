@@ -9,12 +9,10 @@
 <body>
     <div class="container">
         <h1>Chat Status</h1>
-
         <div class="status-display">
             <p>User 1 Status: <span id="user1-status">Loading...</span></p>
             <p>User 2 Status: <span id="user2-status">Loading...</span></p>
         </div>
-
         <div class="controls">
             <h2>Your Status</h2>
             <label class="switch">
@@ -25,6 +23,76 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-app.js";
+        import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-database.js";
+
+        // Your web app's Firebase configuration (NEW PROJECT)
+        const firebaseConfig = {
+            apiKey: "AIzaSyAO-BoxQrr2hKD1T3F9BqR4WCeca5VcsOw",
+            authDomain: "coffee-chat-again.firebaseapp.com",
+            projectId: "coffee-chat-again",
+            storageBucket: "coffee-chat-again.firebasestorage.app",
+            messagingSenderId: "705055102684",
+            appId: "1:705055102684:web:884100f5a0ce14ee344619"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+
+        const statusToggle = document.getElementById('status-toggle');
+        const currentStatusText = document.getElementById('current-status-text');
+        const user1StatusDisplay = document.getElementById('user1-status');
+        const user2StatusDisplay = document.getElementById('user2-status');
+
+        const currentUserId = 'user1';
+        const otherUserId = 'user2';
+
+        function updateStatusDisplay() {
+            const user1StatusRef = ref(database, `users/${currentUserId}/status`);
+            const user2StatusRef = ref(database, `users/${otherUserId}/status`);
+
+            onValue(user1StatusRef, (snapshot) => {
+                const status = snapshot.val();
+                user1StatusDisplay.textContent = status === 'chat' ? 'Available' : 'Not Available';
+            });
+
+            onValue(user2StatusRef, (snapshot) => {
+                const status = snapshot.val();
+                user2StatusDisplay.textContent = status === 'chat' ? 'Available' : 'Not Available';
+            });
+        }
+
+        function handleToggleChange() {
+            const isChecked = statusToggle.checked;
+            const newStatus = isChecked ? 'chat' : 'no_chat';
+
+            const currentUserStatusRef = ref(database, `users/${currentUserId}/status`);
+            set(currentUserStatusRef, newStatus);
+
+            currentStatusText.textContent = `Set to: ${isChecked ? 'Chat' : 'No Chat'}`;
+        }
+
+        const initialStatusRef = ref(database, `users/${currentUserId}/status`);
+        onValue(initialStatusRef, (snapshot) => {
+            const initialStatus = snapshot.val();
+            if (initialStatus === 'chat') {
+                statusToggle.checked = true;
+                currentStatusText.textContent = 'Set to: Chat';
+            } else {
+                statusToggle.checked = false;
+                currentStatusText.textContent = 'Set to: No Chat';
+            }
+        }, {
+            onlyOnce: true
+        });
+
+        statusToggle.addEventListener('change', handleToggleChange);
+
+        updateStatusDisplay();
+
+    </script>
 </body>
 </html>
