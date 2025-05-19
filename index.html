@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat Status</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css"> 
 </head>
+
 <body>
     <div class="container">
         <h1>Chat Status</h1>
@@ -21,13 +22,41 @@
             </label>
             <p id="current-status-text">Set to: No Chat</p>
         </div>
+
+        <div class="auth-container">
+            <h2>Sign Up</h2>
+            <div class="form-group">
+                <label for="signup-email">Email:</label>
+                <input type="email" id="signup-email" placeholder="Enter your email">
+            </div>
+            <div class="form-group">
+                <label for="signup-password">Password:</label>
+                <input type="password" id="signup-password" placeholder="Enter your password">
+            </div>
+            <button id="signup-button">Sign Up</button>
+
+            <h2>Log In</h2>
+            <div class="form-group">
+                <label for="login-email">Email:</label>
+                <input type="email" id="login-email" placeholder="Enter your email">
+            </div>
+            <div class="form-group">
+                <label for="login-password">Password:</label>
+                <input type="password" id="login-password" placeholder="Enter your password">
+            </div>
+            <button id="login-button">Log In</button>
+
+            <button id="logout-button">Log Out</button>
+            <div id="auth-status"></div>
+        </div>
     </div>
 
     <script type="module">
-        // Import the functions you need from the SDKs you need
+        // Import Firebase modules
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-app.js";
-        import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-database.js";
-
+        import { getDatabase, ref, onValue, set, get } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-database.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-auth.js";
+    
         // Your web app's Firebase configuration (NEW PROJECT)
         const firebaseConfig = {
             apiKey: "AIzaSyAO-BoxQrr2hKD1T3F9BqR4WCeca5VcsOw",
@@ -37,62 +66,138 @@
             messagingSenderId: "705055102684",
             appId: "1:705055102684:web:884100f5a0ce14ee344619"
         };
-
+    
         // Initialize Firebase
         const app = initializeApp(firebaseConfig);
         const database = getDatabase(app);
-
+        const auth = getAuth(app); // Initialize Firebase Authentication
+    
         const statusToggle = document.getElementById('status-toggle');
         const currentStatusText = document.getElementById('current-status-text');
         const user1StatusDisplay = document.getElementById('user1-status');
         const user2StatusDisplay = document.getElementById('user2-status');
-
-        const currentUserId = 'user1';
-        const otherUserId = 'user2';
-
-        function updateStatusDisplay() {
-            const user1StatusRef = ref(database, `users/${currentUserId}/status`);
-            const user2StatusRef = ref(database, `users/${otherUserId}/status`);
-
-            onValue(user1StatusRef, (snapshot) => {
+        const authStatusDiv = document.getElementById('auth-status');
+    
+        const signupEmailInput = document.getElementById('signup-email');
+        const signupPasswordInput = document.getElementById('signup-password');
+        const signupButton = document.getElementById('signup-button');
+        const loginEmailInput = document.getElementById('login-email');
+        const loginPasswordInput = document.getElementById('login-password');
+        const loginButton = document.getElementById('login-button');
+        const logoutButton = document.getElementById('logout-button');
+    
+        let loggedInUserId = null;
+    
+        function updateStatusDisplay(userId, displayElement) {
+            const userStatusRef = ref(database, `users/${userId}/status`);
+            onValue(userStatusRef, (snapshot) => {
                 const status = snapshot.val();
-                user1StatusDisplay.textContent = status === 'chat' ? 'Available' : 'Not Available';
-            });
-
-            onValue(user2StatusRef, (snapshot) => {
-                const status = snapshot.val();
-                user2StatusDisplay.textContent = status === 'chat' ? 'Available' : 'Not Available';
+                if (displayElement) {
+                    displayElement.textContent = status === 'chat' ? 'Available' : 'Not Available';
+                }
             });
         }
-
+    
         function handleToggleChange() {
-            const isChecked = statusToggle.checked;
-            const newStatus = isChecked ? 'chat' : 'no_chat';
-
-            const currentUserStatusRef = ref(database, `users/${currentUserId}/status`);
-            set(currentUserStatusRef, newStatus);
-
-            currentStatusText.textContent = `Set to: ${isChecked ? 'Chat' : 'No Chat'}`;
-        }
-
-        const initialStatusRef = ref(database, `users/${currentUserId}/status`);
-        onValue(initialStatusRef, (snapshot) => {
-            const initialStatus = snapshot.val();
-            if (initialStatus === 'chat') {
-                statusToggle.checked = true;
-                currentStatusText.textContent = 'Set to: Chat';
+            if (auth.currentUser) {
+                const isChecked = statusToggle.checked;
+                const newStatus = isChecked ? 'chat' : 'no_chat';
+                const currentUserStatusRef = ref(database, `users/${auth.currentUser.uid}/status`);
+                set(currentUserStatusRef, newStatus);
+                currentStatusText.textContent = `Set to: ${isChecked ? 'Chat' : 'No Chat'}`;
             } else {
+                alert("You must be logged in to change your status.");
                 statusToggle.checked = false;
-                currentStatusText.textContent = 'Set to: No Chat';
             }
-        }, {
-            onlyOnce: true
+        }
+    
+        async function signUpUser(email, password) {
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+                loggedInUserId = user.uid;
+                authStatusDiv.textContent = `Signed up as: ${user.email} (UID: ${user.uid})`;
+                await set(ref(database, `users/${user.uid}/status`), 'no_chat');
+                // Now we need to decide how to display other users' statuses
+            } catch (error) {
+                console.error("Error signing up:", error.message);
+                authStatusDiv.textContent = `Sign up error: ${error.message}`;
+            }
+        }
+    
+        async function logInUser(email, password) {
+            try {
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+                loggedInUserId = user.uid;
+                authStatusDiv.textContent = `Logged in as: ${user.email} (UID: ${user.uid})`;
+                // Now we need to decide how to display other users' statuses
+            } catch (error) {
+                console.error("Error logging in:", error.message);
+                authStatusDiv.textContent = `Log in error: ${error.message}`;
+            }
+        }
+    
+        async function logOutUser() {
+            try {
+                await signOut(auth);
+                loggedInUserId = null;
+                authStatusDiv.textContent = 'Logged out';
+                // Update UI accordingly
+            } catch (error) {
+                console.error("Error logging out:", error.message);
+                authStatusDiv.textContent = `Log out error: ${error.message}`;
+            }
+        }
+    
+        onAuthStateChanged(auth, (user) => {
+            loggedInUserId = user ? user.uid : null;
+            if (user) {
+                console.log("User is signed in:", user.uid);
+                authStatusDiv.textContent = `Logged in as: ${user.email} (UID: ${user.uid})`;
+                // Display your own status in the 'Your Status' section
+                const statusRef = ref(database, `users/${user.uid}/status`);
+                onValue(statusRef, (snapshot) => {
+                    const status = snapshot.val();
+                    currentStatusText.textContent = `Set to: ${status === 'chat' ? 'Chat' : 'No Chat'}`;
+                    statusToggle.checked = status === 'chat';
+                });
+                // For now, let's display the logged-in user's status as "User 1"
+                updateStatusDisplay(user.uid, user1StatusDisplay);
+                // We still need a way to know who "User 2" is. For now, keep listening to the static 'user2'
+                updateStatusDisplay('user2', user2StatusDisplay);
+            } else {
+                loggedInUserId = null;
+                authStatusDiv.textContent = 'Logged out';
+                // Optionally reset status displays
+                currentStatusText.textContent = 'Set to: No Chat';
+                statusToggle.checked = false;
+                updateStatusDisplay('user1', user1StatusDisplay);
+                updateStatusDisplay('user2', user2StatusDisplay);
+            }
         });
-
+    
         statusToggle.addEventListener('change', handleToggleChange);
-
-        updateStatusDisplay();
-
+    
+        signupButton.addEventListener('click', () => {
+            const email = signupEmailInput.value;
+            const password = signupPasswordInput.value;
+            signUpUser(email, password);
+        });
+    
+        loginButton.addEventListener('click', () => {
+            const email = loginEmailInput.value;
+            const password = loginPasswordInput.value;
+            logInUser(email, password);
+        });
+    
+        logoutButton.addEventListener('click', () => {
+            logOutUser();
+        });
+    
+        // Initial status display for the hardcoded users (for now) - might not be needed anymore
+        updateStatusDisplay('user1', user1StatusDisplay);
+        updateStatusDisplay('user2', user2StatusDisplay);
+    
     </script>
 </body>
-</html>
