@@ -28,22 +28,30 @@
             <h2>Sign Up</h2>
             <div class="form-group">
                 <label for="signup-email">Email:</label>
-                <input type="email" id="signup-email" placeholder="Enter your email">
+                <input type="email" id="signup-email" placeholder="Enter your email" required>
+            </div>
+            <div class="form-group">
+                <label for="signup-username">Username:</label>
+                <input type="text" id="signup-username" placeholder="Choose a username" required>
             </div>
             <div class="form-group">
                 <label for="signup-password">Password:</label>
-                <input type="password" id="signup-password" placeholder="Enter your password">
+                <input type="password" id="signup-password" placeholder="Create a password" required>
             </div>
             <button id="signup-button">Sign Up</button>
 
             <h2>Log In</h2>
             <div class="form-group">
                 <label for="login-email">Email:</label>
-                <input type="email" id="login-email" placeholder="Enter your email">
+                <input type="email" id="login-email" placeholder="Enter your email" required>
             </div>
             <div class="form-group">
                 <label for="login-password">Password:</label>
-                <input type="password" id="login-password" placeholder="Enter your password">
+                <input type="password" id="login-password" placeholder="Enter your password" required>
+            </div>
+            <div class="form-group">
+                <label for="login-username">Username (Optional for update):</label>
+                <input type="text" id="login-username" placeholder="Update your username (optional)">
             </div>
             <button id="login-button">Log In</button>
 
@@ -55,7 +63,8 @@
     <script type="module">
         // Import Firebase modules
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-app.js";
-        import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-database.js";
+        // Make sure 'get' and 'update' are imported
+        import { getDatabase, ref, onValue, set, get, update } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-database.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-auth.js";
 
         // Your web app's Firebase configuration (NEW PROJECT)
@@ -65,7 +74,8 @@
             projectId: "coffee-chat-again",
             storageBucket: "coffee-chat-again.firebasestorage.app",
             messagingSenderId: "705055102684",
-            appId: "1:705055102684:web:884100f5a0ce14ee344619"
+            appId: "1:705055102684:web:884100f5a0ce14ee344619",
+            databaseURL: "https://coffee-chat-again-default-rtdb.firebaseio.com/" // IMPORTANT: Make sure this is still correct
         };
 
         // Initialize Firebase
@@ -76,34 +86,39 @@
         // Get HTML elements
         const statusToggle = document.getElementById('status-toggle');
         const currentStatusText = document.getElementById('current-status-text');
-        const allUsersStatusDiv = document.getElementById('all-users-status'); // New element for dynamic display
+        const allUsersStatusDiv = document.getElementById('all-users-status');
         const authStatusDiv = document.getElementById('auth-status');
 
         const signupEmailInput = document.getElementById('signup-email');
+        const signupUsernameInput = document.getElementById('signup-username'); // New username input
         const signupPasswordInput = document.getElementById('signup-password');
         const signupButton = document.getElementById('signup-button');
+
         const loginEmailInput = document.getElementById('login-email');
         const loginPasswordInput = document.getElementById('login-password');
+        const loginUsernameInput = document.getElementById('login-username'); // New username input for login (optional update)
         const loginButton = document.getElementById('login-button');
+
         const logoutButton = document.getElementById('logout-button');
 
         let loggedInUserId = null; // To store the current user's UID
 
         // --- Firebase Authentication Functions ---
 
-        async function signUpUser(email, password) {
+        async function signUpUser(email, username, password) {
             try {
                 const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                 const user = userCredential.user;
                 console.log("User signed up:", user);
                 authStatusDiv.textContent = `Signed up as: ${user.email} (UID: ${user.uid})`;
 
-                // Initialize user data in Realtime Database, including email
+                // Initialize user data in Realtime Database, including email and username
                 await set(ref(database, `users/${user.uid}`), {
                     email: user.email,
+                    username: username, // Save the chosen username
                     status: 'no_chat'
                 });
-                console.log(`Initial status set for new user: ${user.email}`);
+                console.log(`Initial status set for new user: ${user.email} with username: ${username}`);
 
             } catch (error) {
                 console.error("Error signing up:", error.message);
@@ -111,13 +126,55 @@
             }
         }
 
-        async function logInUser(email, password) {
+        async function logInUser(email, password, optionalUsername = null) {
             try {
                 const userCredential = await signInWithEmailAndPassword(auth, email, password);
                 const user = userCredential.user;
                 console.log("User logged in:", user);
                 authStatusDiv.textContent = `Logged in as: ${user.email} (UID: ${user.uid})`;
-                // No need to set initial status here, it should already exist from signup
+
+                const userRef = ref(database, `users/${user.uid}`);
+                const snapshot = await get(userRef); // Get current user data
+
+                if (snapshot.exists()) {
+                    const userData = snapshot.val();
+                    let updates = {};
+
+                    // Ensure email is stored (for older entries that might be missing it)
+                    if (!userData.email) {
+                        updates.email = user.email;
+                    }
+
+                    // Check for username:
+                    // If login form provided a username, update it.
+                    // If no username in DB AND no username provided in form, set it to email prefix
+                    if (optionalUsername && optionalUsername.trim() !== '') {
+                        updates.username = optionalUsername.trim();
+                    } else if (!userData.username) {
+                        // If user doesn't have a username in DB, set a default from email
+                        updates.username = user.email.split('@')[0]; // Use email prefix as default username
+                    }
+
+                    // Ensure status exists (for older entries that might be missing it)
+                    if (!userData.status) {
+                        updates.status = 'no_chat';
+                    }
+
+                    // Perform update if there are any changes
+                    if (Object.keys(updates).length > 0) {
+                        await update(userRef, updates);
+                        console.log("User profile updated in DB:", updates);
+                    }
+                } else {
+                    // Fallback: If no user profile found in DB, create a new one with email and default username/status
+                    console.log("User profile not found in DB, creating new entry.");
+                    await set(userRef, {
+                        email: user.email,
+                        username: optionalUsername || user.email.split('@')[0], // Use provided username or email prefix
+                        status: 'no_chat'
+                    });
+                }
+
             } catch (error) {
                 console.error("Error logging in:", error.message);
                 authStatusDiv.textContent = `Log in error: ${error.message}`;
@@ -129,10 +186,9 @@
                 await signOut(auth);
                 console.log("User logged out");
                 authStatusDiv.textContent = 'Logged out';
-                // Reset UI elements or hide user-specific content
                 statusToggle.checked = false;
                 currentStatusText.textContent = 'Set to: No Chat';
-                allUsersStatusDiv.innerHTML = '<p>Loading user statuses...</p>'; // Clear dynamic user list
+                allUsersStatusDiv.innerHTML = '<p>Loading user statuses...</p>';
             } catch (error) {
                 console.error("Error logging out:", error.message);
                 authStatusDiv.textContent = `Log out error: ${error.message}`;
@@ -141,25 +197,24 @@
 
         // --- Realtime Database Interaction Functions ---
 
-        // This function will listen to the entire 'users' node
-        // and dynamically update the display for ALL users.
         function setupAllUsersStatusListener() {
             const usersRef = ref(database, 'users');
             onValue(usersRef, (snapshot) => {
-                const usersData = snapshot.val(); // Get all users data
-                allUsersStatusDiv.innerHTML = ''; // Clear previous list
+                const usersData = snapshot.val();
+                allUsersStatusDiv.innerHTML = '';
 
                 if (usersData) {
                     for (const uid in usersData) {
                         if (usersData.hasOwnProperty(uid)) {
                             const user = usersData[uid];
-                            const userEmail = user.email || 'Unknown User'; // Use email or a placeholder
+                            // Prioritize username, fallback to email, then 'Unknown User'
+                            const displayName = user.username || user.email || 'Unknown User';
                             const userStatus = user.status === 'chat' ? 'Available' : 'Not Available';
 
                             const p = document.createElement('p');
-                            p.textContent = `${userEmail} Status: `;
+                            p.textContent = `${displayName} Status: `; // Display username
                             const span = document.createElement('span');
-                            span.id = `status-${uid}`; // Give it a unique ID based on UID
+                            span.id = `status-${uid}`;
                             span.textContent = userStatus;
                             p.appendChild(span);
 
@@ -172,17 +227,16 @@
             });
         }
 
-        // Handles the toggle change for the CURRENTLY LOGGED-IN user
         function handleToggleChange() {
             if (auth.currentUser) {
                 const isChecked = statusToggle.checked;
                 const newStatus = isChecked ? 'chat' : 'no_chat';
                 const currentUserStatusRef = ref(database, `users/${auth.currentUser.uid}/status`);
                 set(currentUserStatusRef, newStatus);
-                currentStatusText.textContent = `Set to: ${isChecked ? 'Chat' : 'No Chat'}`; // Update local UI
+                currentStatusText.textContent = `Set to: ${isChecked ? 'Chat' : 'No Chat'}`;
             } else {
                 alert("You must be logged in to change your status.");
-                statusToggle.checked = false; // Reset the toggle if not logged in
+                statusToggle.checked = false;
             }
         }
 
@@ -194,51 +248,64 @@
                 console.log("User is signed in:", user.uid);
                 authStatusDiv.textContent = `Logged in as: ${user.email} (UID: ${user.uid})`;
 
-                // Listen to THIS user's specific status to update the toggle and "Your Status" text
                 const currentUserStatusRef = ref(database, `users/${user.uid}/status`);
                 onValue(currentUserStatusRef, (snapshot) => {
                     const status = snapshot.val();
-                    if (status !== null) { // Only update if status exists
+                    if (status !== null) {
                         statusToggle.checked = status === 'chat';
                         currentStatusText.textContent = `Set to: ${status === 'chat' ? 'Chat' : 'No Chat'}`;
                     } else {
-                        // If no status, default to no_chat and update DB (e.g., first login)
+                        // If no status, default to no_chat and update DB
                         set(currentUserStatusRef, 'no_chat');
                         statusToggle.checked = false;
                         currentStatusText.textContent = 'Set to: No Chat';
                     }
                 });
 
-                // Ensure initial status is set if not already
-                set(currentUserStatusRef, statusToggle.checked ? 'chat' : 'no_chat');
+                // Ensure initial status is set if not already (this set happens once after login)
+                // It's good to ensure a status exists, but `onValue` above will also trigger it.
+                // We'll keep this as a simple check for first time login or if status was somehow removed.
+                get(currentUserStatusRef).then(snapshot => {
+                    if (!snapshot.exists()) {
+                        set(currentUserStatusRef, 'no_chat');
+                    }
+                });
+
 
             } else {
                 console.log("User is signed out");
                 authStatusDiv.textContent = 'Logged out';
-                // Reset toggle and status text when logged out
                 statusToggle.checked = false;
                 currentStatusText.textContent = 'Set to: No Chat';
             }
-
-            // Always setup the listener for all users, regardless of login state
-            // (You might want to restrict this based on login for a real app,
-            // but for now, it shows everyone's status if they exist in DB)
-            setupAllUsersStatusListener();
+            setupAllUsersStatusListener(); // Update the list of all users
         });
-
 
         // --- Event Listeners ---
         statusToggle.addEventListener('change', handleToggleChange);
+
         signupButton.addEventListener('click', () => {
             const email = signupEmailInput.value;
+            const username = signupUsernameInput.value;
             const password = signupPasswordInput.value;
-            signUpUser(email, password);
+            if (email && username && password) {
+                signUpUser(email, username, password);
+            } else {
+                alert('Please fill in all signup fields (email, username, password).');
+            }
         });
+
         loginButton.addEventListener('click', () => {
             const email = loginEmailInput.value;
             const password = loginPasswordInput.value;
-            logInUser(email, password);
+            const username = loginUsernameInput.value; // Optional username for update
+            if (email && password) {
+                logInUser(email, password, username);
+            } else {
+                alert('Please fill in login email and password.');
+            }
         });
+
         logoutButton.addEventListener('click', () => {
             logOutUser();
         });
