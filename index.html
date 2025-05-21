@@ -9,54 +9,57 @@
 
 <body>
     <div class="container">
-        <h1>Chat Status</h1>
+        <div id="auth-page">
+            <h1>Welcome to Chat Status!</h1>
+            <div class="auth-container">
+                <h2>Sign Up</h2>
+                <div class="form-group">
+                    <label for="signup-email">Email:</label>
+                    <input type="email" id="signup-email" placeholder="Enter your email" required>
+                </div>
+                <div class="form-group">
+                    <label for="signup-username">Username:</label>
+                    <input type="text" id="signup-username" placeholder="Choose a username" required>
+                </div>
+                <div class="form-group">
+                    <label for="signup-password">Password:</label>
+                    <input type="password" id="signup-password" placeholder="Create a password" required>
+                </div>
+                <button id="signup-button">Sign Up</button>
 
-        <div class="status-display" id="all-users-status">
-            <p>Loading user statuses...</p>
+                <h2>Log In</h2>
+                <div class="form-group">
+                    <label for="login-email">Email:</label>
+                    <input type="email" id="login-email" placeholder="Enter your email" required>
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Password:</label>
+                    <input type="password" id="login-password" placeholder="Enter your password" required>
+                </div>
+                <div class="form-group">
+                    <label for="login-username">Username (Optional for update):</label>
+                    <input type="text" id="login-username" placeholder="Update your username (optional)">
+                </div>
+                <button id="login-button">Log In</button>
+
+                <div id="auth-status"></div> </div>
         </div>
 
-        <div class="controls">
-            <h2>Your Status</h2>
-            <label class="switch">
-                <input type="checkbox" id="status-toggle">
-                <span class="slider round"></span>
-            </label>
-            <p id="current-status-text">Set to: No Chat</p>
-        </div>
+        <div id="status-page" style="display: none;"> <h1>Chat Status Board</h1>
 
-        <div class="auth-container">
-            <h2>Sign Up</h2>
-            <div class="form-group">
-                <label for="signup-email">Email:</label>
-                <input type="email" id="signup-email" placeholder="Enter your email" required>
+            <div class="status-display" id="all-users-status">
+                <p>Loading user statuses...</p>
             </div>
-            <div class="form-group">
-                <label for="signup-username">Username:</label>
-                <input type="text" id="signup-username" placeholder="Choose a username" required>
-            </div>
-            <div class="form-group">
-                <label for="signup-password">Password:</label>
-                <input type="password" id="signup-password" placeholder="Create a password" required>
-            </div>
-            <button id="signup-button">Sign Up</button>
 
-            <h2>Log In</h2>
-            <div class="form-group">
-                <label for="login-email">Email:</label>
-                <input type="email" id="login-email" placeholder="Enter your email" required>
+            <div class="controls">
+                <h2>Your Status</h2>
+                <label class="switch">
+                    <input type="checkbox" id="status-toggle">
+                    <span class="slider round"></span>
+                </label>
+                <p id="current-status-text">Set to: No Chat</p>
             </div>
-            <div class="form-group">
-                <label for="login-password">Password:</label>
-                <input type="password" id="login-password" placeholder="Enter your password" required>
-            </div>
-            <div class="form-group">
-                <label for="login-username">Username (Optional for update):</label>
-                <input type="text" id="login-username" placeholder="Update your username (optional)">
-            </div>
-            <button id="login-button">Log In</button>
-
             <button id="logout-button">Log Out</button>
-            <div id="auth-status"></div>
         </div>
     </div>
 

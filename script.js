@@ -1,6 +1,5 @@
 // Import Firebase modules
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-app.js";
-// Make sure 'get' and 'update' are imported
 import { getDatabase, ref, onValue, set, get, update } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-database.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-auth.js";
 
@@ -18,13 +17,13 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
-const auth = getAuth(app); // Initialize Firebase Authentication
+const auth = getAuth(app);
 
 // Get HTML elements
 const statusToggle = document.getElementById('status-toggle');
 const currentStatusText = document.getElementById('current-status-text');
 const allUsersStatusDiv = document.getElementById('all-users-status');
-const authStatusDiv = document.getElementById('auth-status');
+const authStatusDiv = document.getElementById('auth-status'); // For login/signup messages
 
 const signupEmailInput = document.getElementById('signup-email');
 const signupUsernameInput = document.getElementById('signup-username');
@@ -38,42 +37,89 @@ const loginButton = document.getElementById('login-button');
 
 const logoutButton = document.getElementById('logout-button');
 
+// NEW: Get references to the page containers
+const authPage = document.getElementById('auth-page');
+const statusPage = document.getElementById('status-page');
+
+// Initial check for element existence
+if (!authPage) console.error("Error: auth-page element not found!");
+if (!statusPage) console.error("Error: status-page element not found!");
+
 let loggedInUserId = null; // To store the current user's UID
+
+// --- Page Management Functions ---
+// These functions control which 'page' div is visible
+function showAuthPage() {
+    console.log("Attempting to show Auth Page.");
+    if (authPage) {
+        authPage.style.display = 'block';
+        console.log("authPage display after set:", authPage.style.display);
+    } else {
+        console.error("authPage element is null when trying to show Auth Page.");
+    }
+
+    if (statusPage) {
+        statusPage.style.display = 'none';
+        console.log("statusPage display after set (hide):", statusPage.style.display);
+    } else {
+        console.error("statusPage element is null when trying to hide status Page.");
+    }
+}
+
+function showStatusPage() {
+    console.log("Attempting to show Status Page.");
+    if (authPage) {
+        authPage.style.display = 'none';
+        console.log("authPage display after set (hide):", authPage.style.display);
+    } else {
+        console.error("authPage element is null when trying to hide Auth Page.");
+    }
+
+    if (statusPage) {
+        statusPage.style.display = 'block';
+        console.log("statusPage display after set:", statusPage.style.display);
+    } else {
+        console.error("statusPage element is null when trying to show Status Page.");
+    }
+}
 
 // --- Firebase Authentication Functions ---
 
 async function signUpUser(email, username, password) {
     try {
+        console.log("signUpUser: Attempting to create user...");
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
-        console.log("User signed up:", user);
-        authStatusDiv.textContent = `Signed up as: ${user.email} (UID: ${user.uid})`;
+        console.log("signUpUser: User created:", user.uid);
+        authStatusDiv.textContent = `Signed up! Welcome, ${username || user.email}!`; // Display welcome on auth page
 
         // Initialize user data in Realtime Database, including email and username
         await set(ref(database, `users/${user.uid}`), {
             email: user.email,
-            username: username, // Save the chosen username
+            username: username,
             status: 'no_chat'
         });
-        console.log(`Initial status set for new user: ${user.email} with username: ${username}`);
+        console.log("signUpUser: Initial user data set in DB.");
 
     } catch (error) {
-        console.error("Error signing up:", error.message);
+        console.error("signUpUser: Error signing up:", error.message);
         authStatusDiv.textContent = `Sign up error: ${error.message}`;
     }
 }
 
 async function logInUser(email, password, optionalUsername = null) {
     try {
+        console.log("logInUser: Attempting to sign in...");
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
-        console.log("User logged in:", user);
-        authStatusDiv.textContent = `Logged in as: ${user.email} (UID: ${user.uid})`;
+        console.log("logInUser: User signed in:", user.uid);
+        authStatusDiv.textContent = `Logged in! Welcome back!`; // Display welcome on auth page
 
         const userRef = ref(database, `users/${user.uid}`);
         const snapshot = await get(userRef);
 
         if (snapshot.exists()) {
+            console.log("logInUser: User profile exists in DB.");
             const userData = snapshot.val();
             let updates = {};
 
@@ -93,10 +139,10 @@ async function logInUser(email, password, optionalUsername = null) {
 
             if (Object.keys(updates).length > 0) {
                 await update(userRef, updates);
-                console.log("User profile updated in DB:", updates);
+                console.log("logInUser: User profile updated in DB:", updates);
             }
         } else {
-            console.log("User profile not found in DB, creating new entry.");
+            console.log("logInUser: User profile not found in DB, creating new entry.");
             await set(userRef, {
                 email: user.email,
                 username: optionalUsername || user.email.split('@')[0],
@@ -105,22 +151,22 @@ async function logInUser(email, password, optionalUsername = null) {
         }
 
     } catch (error) {
-        console.error("Error logging in:", error.message);
+        console.error("logInUser: Error logging in:", error.message);
         authStatusDiv.textContent = `Log in error: ${error.message}`;
     }
 }
 
 async function logOutUser() {
     try {
+        console.log("logOutUser: Attempting to sign out...");
         await signOut(auth);
-        console.log("User logged out");
-        authStatusDiv.textContent = 'Logged out';
+        console.log("logOutUser: User logged out.");
         statusToggle.checked = false;
         currentStatusText.textContent = 'Set to: No Chat';
-        allUsersStatusDiv.innerHTML = '<p>Loading user statuses...</p>';
+        allUsersStatusDiv.innerHTML = '<p>Loading user statuses...</p>'; // Clear status list
     } catch (error) {
-        console.error("Error logging out:", error.message);
-        authStatusDiv.textContent = `Log out error: ${error.message}`;
+        console.error("logOutUser: Error logging out:", error.message);
+        authStatusDiv.textContent = `Log out error: ${error.message}`; // Show error on auth page if it fails
     }
 }
 
@@ -130,7 +176,7 @@ function setupAllUsersStatusListener() {
     const usersRef = ref(database, 'users');
     onValue(usersRef, (snapshot) => {
         const usersData = snapshot.val();
-        allUsersStatusDiv.innerHTML = '';
+        allUsersStatusDiv.innerHTML = ''; // Clear previous list
 
         if (usersData) {
             for (const uid in usersData) {
@@ -165,17 +211,23 @@ function handleToggleChange() {
     } else {
         alert("You must be logged in to change your status.");
         statusToggle.checked = false;
+        // This case should ideally not happen if page logic is correct (toggle only visible when logged in)
     }
 }
 
 // --- Authentication State Observer ---
+// This is the primary controller for which page is shown
 onAuthStateChanged(auth, (user) => {
     loggedInUserId = user ? user.uid : null;
+    console.log("onAuthStateChanged triggered. User:", user ? user.uid : "null (logged out)");
+
 
     if (user) {
-        console.log("User is signed in:", user.uid);
-        authStatusDiv.textContent = `Logged in as: ${user.email} (UID: ${user.uid})`;
+        console.log("onAuthStateChanged: User is signed in. Calling showStatusPage().");
+        showStatusPage(); // This should be the key
+        authStatusDiv.textContent = ''; // Clear auth message once page switches
 
+        // Set up listener for current user's status when logged in
         const currentUserStatusRef = ref(database, `users/${user.uid}/status`);
         onValue(currentUserStatusRef, (snapshot) => {
             const status = snapshot.val();
@@ -183,12 +235,14 @@ onAuthStateChanged(auth, (user) => {
                 statusToggle.checked = status === 'chat';
                 currentStatusText.textContent = `Set to: ${status === 'chat' ? 'Chat' : 'No Chat'}`;
             } else {
+                // If no status, default to no_chat and update DB
                 set(currentUserStatusRef, 'no_chat');
                 statusToggle.checked = false;
                 currentStatusText.textContent = 'Set to: No Chat';
             }
         });
 
+        // Ensure initial status exists for the user when they log in/page loads
         get(currentUserStatusRef).then(snapshot => {
             if (!snapshot.exists()) {
                 set(currentUserStatusRef, 'no_chat');
@@ -196,13 +250,14 @@ onAuthStateChanged(auth, (user) => {
         });
 
     } else {
-        console.log("User is signed out");
-        authStatusDiv.textContent = 'Logged out';
-        statusToggle.checked = false;
-        currentStatusText.textContent = 'Set to: No Chat';
+        console.log("onAuthStateChanged: User is signed out. Calling showAuthPage().");
+        showAuthPage();
+        authStatusDiv.textContent = ''; // Clear auth message
     }
+    // Always set up the all users status listener; it will only be visible on status page
     setupAllUsersStatusListener();
 });
+
 
 // --- Event Listeners ---
 statusToggle.addEventListener('change', handleToggleChange);
@@ -214,21 +269,24 @@ signupButton.addEventListener('click', () => {
     if (email && username && password) {
         signUpUser(email, username, password);
     } else {
-        alert('Please fill in all signup fields (email, username, password).');
+        authStatusDiv.textContent = 'Please fill in all signup fields (email, username, password).';
     }
 });
 
 loginButton.addEventListener('click', () => {
     const email = loginEmailInput.value;
     const password = loginPasswordInput.value;
-    const username = loginUsernameInput.value;
+    const username = loginUsernameInput.value; // Optional username for update
     if (email && password) {
         logInUser(email, password, username);
     } else {
-        alert('Please fill in login email and password.');
+        authStatusDiv.textContent = 'Please fill in login email and password.';
     }
 });
 
 logoutButton.addEventListener('click', () => {
     logOutUser();
 });
+
+// Initial check: The onAuthStateChanged listener is asynchronous and will fire
+// immediately on page load to determine the user's state and show the correct page.
